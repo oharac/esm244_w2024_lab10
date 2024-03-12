@@ -22,7 +22,7 @@ library(here)
 
 ```
 
-## API used in Shiny App
+# API used in Shiny App
 
 https://tylerclavelle.shinyapps.io/thePhactory/
 
@@ -30,7 +30,7 @@ see https://docs.phish.net/examples for API documentation.
 
 Also, check out https://shiny.rstudio.com/articles/shinyapps.html to deploy your Shiny app online for other users.  Free account is limited to 25 hours of user time per month, and better than nothing!
 
-## Accessing IUCN API
+# Accessing IUCN API
 
 - first: add API key to .Renviron and why do it this way?
     - in console: `usethis::edit_r_environ()`
@@ -47,7 +47,7 @@ api_key <- Sys.getenv('IUCN_KEY')
 api_key <- '9bb4facb6d23f48efbf424bb05c0c1ef1cf6f468393bc745d42179ac4aca5fee'
 ```
 
-### Get the IUCN Redlist version: look up the endpoint on the reference!
+## Get the IUCN Redlist version: look up the endpoint on the reference!
 
 The documentation for the IUCN RedList REST API is very thorough, and will be useful throughout this lab to identify various endpoints for different types of queries we want to perform: https://apiv3.iucnredlist.org/api/v3/docs
 
@@ -63,7 +63,7 @@ api_version <- jsonlite::fromJSON(version_url)
 api_version$version
 ```
 
-### Get a count of how many species have been assessed
+## Get a count of how many species have been assessed
 
 Here we need to use the token to access this endpoint.
 
@@ -80,7 +80,7 @@ spp_count <- jsonlite::fromJSON(count_url)
 spp_count$count
 ```
 
-### Get a page of results
+## Get a page of results
 
 Now we can also add parameter values to the endpoint.
 
@@ -103,7 +103,7 @@ ggplot(spp_df) +
   theme_minimal()
 ```
 
-### Get current and historic assessment info for a species
+## Get current and historic assessment info for a species
 
 historic assessments endpoint: `/api/v3/species/history/name/:name?token='YOUR TOKEN'`
 
@@ -122,7 +122,7 @@ spp_hist_df <- spp_hist$result
 spp_hist_df
 ```
 
-### Pull threats and narrative, and extract information on gear types
+## Pull threats and narrative, and extract information on gear types
 
 Threats: `/api/v3/threats/species/name/:name?token='YOUR TOKEN'`
 Narratives: `/api/v3/species/narrative/:name?token='YOUR TOKEN'`
@@ -141,14 +141,62 @@ spp_narr$threats
 
 Note that the IUCN Red List site literally just calls its own API to build each page when you type in a species name!
 
+# ERDDAP
 
-## Map threatened status
+NOAA's [ERDDAP (Environmental Research Division Data Access Program)](https://coastwatch.pfeg.noaa.gov/erddap/index.html) site is home to thousands of datasets on environmental, biogeochemical, and ecological quantities, from satellites/remote sensing and in-situ sensors etc.  These datasets can be searched through their website, but can also be accessed programmatically.  Let's search for annual precipitation data for California (latitudes 32 to 42, longitudes -114 to -125).  Set the time, lat, long appropriately, and for demo purposes, let's settle for a coarser resolution - set the stride to 5 so we're getting every 5th point.  Let's save that out as netCDF, a raster format.
+
+The resulting URL is: `https://coastwatch.pfeg.noaa.gov/erddap/griddap/chirps20GlobalAnnualP05.nc?precip%5B(1981-01-01T00:00:00Z):1:(2023-01-01T00:00:00Z)%5D%5B(32):5:(42)%5D%5B(-114):5:(-125)%5D`
+
+This has already been downloaded and saved in the data folder, as `precip_ca_1981_2023.nc`.
+
+```{r}
+precip_ca <- rast(here::here('data/precip_ca_1981_2023.nc')) %>%
+  setNames(paste('precip', 1981:2023, sep = '_'))
+
+plot(precip_ca[['precip_1998']]) ### strong El Nino year
+```
+
+But, we can also access directly using the URL:
+
+```{r}
+precip_url <- 'https://coastwatch.pfeg.noaa.gov/erddap/griddap/chirps20GlobalAnnualP05.nc?precip%5B(1981-01-01T00:00:00Z):1:(2023-01-01T00:00:00Z)%5D%5B(32):5:(42)%5D%5B(-114):5:(-125)%5D'
+
+precip_ca2 <- rast(precip_url) %>%
+  setNames(paste('precip', 1981:2023, sep = '_'))
+
+plot(precip_ca2[['precip_2013']]) ### drought year
+```
+
+And we can use R (or any other programming language) to automate searches and access!
+
+```{r}
+search_terms <- 'precipitation%20global%20annual' ### %20 to encode spaces between terms
+
+url_stem <- 'https://coastwatch.pfeg.noaa.gov/erddap/search/index.%s?page=1&itemsPerPage=1000&searchFor=%s'
+
+url_search1 <- sprintf(url_stem, 'json', search_terms)
+
+result1_list <- fromJSON(url_search1)
+result1_df <- as.data.frame(result1_list$table$rows) %>%
+  setNames(result1_list$table$columnNames)
+
+url_search2 <- sprintf(url_stem, 'csv', search_terms)
+
+result2_df <- read_csv(url_search2)
+
+result2_df$griddap[1]
+```
+
+And if you know how to structure a query, you can use that URL to create your own Not quite as clean as a well-structured API, but still pretty cool...
+
+
+# Map threatened status (optional, not run in lab)
 
 Goal: per cell, calculate proportion of species considered threatened (IUCN Red List VU, EN, CR).  Here, I have assembled information from the IUCN API on species names and threatened status (among other details).  This is data I have used for my own research, so some columns are particular to my research needs, but not for the purposes of this lab.
 
 I have also assembled and filtered information from AquaMaps species distributions to focus only on species present off the coast of California, including species IDs, species scientific binomial (genus species), and probability of occurrence in various cells noted by a cell ID code, LOICZID.
 
-### Read in all the info!
+## Read in all the info!
 
 Read in info about species occurrence in various spatial cells
 
@@ -166,7 +214,7 @@ spp_cells <- read_csv(here('data/am_spp_cells.csv'))
 spp_ids <- read_csv(here('data/am_spp_ids.csv'))
 ```
 
-### Pseudocode: 
+## Pseudocode: 
 
 How can we combine species info, spatial info, and extinction risk info to create a map of the proportion of threatened species?
 
@@ -190,7 +238,7 @@ threatened_pct_cells <- spp_risk_cells %>%
   summarize(pct_threatened = sum(threatened) / n())
 ```
 
-### Convert cells into a raster object
+## Convert cells into a raster object
 
 If we wished to do spatial analysis with this lat-long map of percent threatened species, we can convert our grid to a raster.  Don't forget to tell it our CRS, which since we are using lat-long data, we can use WGS84, EPSG code 4326.
 
@@ -200,7 +248,7 @@ spp_risk_rast <- rast(threatened_pct_cells, type = 'xyz', crs = 'epsg:4326')
 plot(spp_risk_rast)
 ```
 
-### Plot with ggplot
+## Plot with ggplot
 
 `tidyterra::geom_spatraster` can be used to plot `terra::rast` spatial rasters, just like `sf::geom_sf` can plot `sf` spatial vector objects.
 
@@ -212,7 +260,7 @@ p <- ggplot() +
 p
 ```
 
-### Let's finalize our map by overlaying a continent shape
+## Let's finalize our map by overlaying a continent shape
 
 We will use vector data from Natural Earth, using the `rnaturalearth` package.  To get higher resolution vector data of global countries, install the `rnaturalearthdata` and `rnaturalearthhires` packages too.
 
