@@ -28,7 +28,7 @@ https://tylerclavelle.shinyapps.io/thePhactory/
 
 see https://docs.phish.net/examples for API documentation.
 
-Also, check out https://shiny.rstudio.com/articles/shinyapps.html to deploy your Shiny app online for other users.  Free account is limited to 25 hours of user time per month, and better than nothing!
+Also, check out https://shiny.posit.co/r/articles/share/shinyapps/ to deploy your Shiny app online for other users.  Free account is limited to 25 hours of user time per month, and better than nothing!
 
 # Accessing IUCN API
 
